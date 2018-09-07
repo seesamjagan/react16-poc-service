@@ -61,9 +61,10 @@ let db = new sqlite3.Database('./data/jagan-todos.db', sqlite3.OPEN_READWRITE | 
 
 function insertDefaultValues() {
     db.parallelize(() => {
-        let todos = tempTODOs.map(todo => ({ label: todo, id: Date.now(), status: TODO_STATUS.OPEN }));
+        let todos = tempTODOs.map((todo, index) => ({ label: todo, id: index, status: TODO_STATUS.OPEN }));
         todos.forEach(todo => {
-            db.run(`INSERT INTO AI(id, label, status, ts) VALUES("${todo.id}", "${todo.label}", "${todo.status}", "${Date.now()}")`, (error) => {
+            let sql = `INSERT INTO AI(id, label, status, ts) VALUES(?, ?, ?, ?)`;
+            db.run(sql, [todo.id, todo.label, todo.status, Date.now()], (error) => {
                 if (error) {
                     console.error(error);
                 }
