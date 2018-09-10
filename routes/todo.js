@@ -35,6 +35,20 @@ const TODO_STATUS = {
     CANCELLED: 4
 }
 
+const TODO_PRIORITY = {
+    BLOCKER: 0,
+    CRITICAL: 1,
+    HIGH: 2,
+    NORMAL: 3,
+    LOW: 4
+}
+
+const TODO_TYPE = {
+    TASK: 0,
+    BUG: 1,
+    
+}
+
 const DB_RUN_MODE = {
     DEFAULT: false,
     PARALLIZE: 'parallize',
@@ -63,23 +77,27 @@ function run(sql, params = [], callback = null, runMode = false, useAll=false) {
         if (error) {
             callback && callback(error);
         } else {
+            let command = useAll ? 'all' : 'run';
             if (runMode) {
                 db[runMode](() => {
-                    // TODO :: modify this case to run multiple sql's
-                    // TODO :: conside useAll
                     // TODO :: how to make a single 'callback' when running multiple [COMMANDS] ?
-                    db.run(sql, params, (error, rows) => {
-                        if (error) {
-                            callback && callback(error);
-                        } else {
-                            callback && callback(null, rows);
-                        }
+                    // TODO :: test this case
+                    let queries = sql;
+                    if(!Array.isArray(sql)) {
+                        queries = [sql];
+                    }
+                    queries.forEach(sql, ()=>{
+                        db[command](sql, params, (error, rows) => {
+                            if (error) {
+                                callback && callback(error);
+                            } else {
+                                callback && callback(null, rows);
+                            }
+                        });
                     });
                     db.close();
                 });
             } else {
-                let command = useAll ? 'all' : 'run';
-
                 db[command](sql, params, (error, result) => {
                     if (error) {
                         callback && callback(error);
@@ -94,7 +112,9 @@ function run(sql, params = [], callback = null, runMode = false, useAll=false) {
 }
 
 function initilizeDB() {
-    run('CREATE TABLE AI(id, label, status, ts)', [], (error, result) => {
+    let sql = `CREATE TABLE AI(id PRIMARY KEY, title, status DEFAULT ${TODO_STATUS.OPEN}, description DEFAULT "", priority DEFAULT ${TODO_PRIORITY.HIGH}, type DEFAULT ${TODO_TYPE.TASK})`;
+    let params = [];
+    run(sql, params, (error, result) => {
         if (error) {
             console.error('Failed to create tabel AI', error);
         } else {
@@ -106,16 +126,16 @@ function initilizeDB() {
 
 
 function insertDefaultValues() {
-    let todos = tempTODOs.map((todo, index) => ({ label: todo, id: index, status: TODO_STATUS.OPEN }));
+    let todos = tempTODOs.map((todo, index) => ({ title: todo, id: index}));
     let query = [], params = [];
     todos.forEach(todo => {
-        query.push('(?, ?, ?, ?)');
-        params.push(todo.id, todo.label, todo.status, Date.now());
+        query.push('(?, ?)');
+        params.push(todo.id, todo.title);
     });
-    let sql = `INSERT INTO AI(id, label, status, ts) VALUES${query.join(', ')}`;
+    let sql = `INSERT INTO AI(id, title) VALUES${query.join(', ')}`;
     run(sql, params, (error, result) => {
         if (error) {
-            console.error(error);
+            console.error('Failed to inser default values in AI', error);
         } else {
             console.info('Initilized AI table with default values');
         }
@@ -133,16 +153,17 @@ router.all('/', function (req, res, next) {
 router.all('/update', function (req, res, next) {
 
     let payload = req.body;
-    let sql = `UPDATE AI SET status=?, label=? WHERE id=?`;
-    run(sql, [payload.status, payload.label, payload.id], (error, result) => requestHandler(error, result, req, res, next), DB_RUN_MODE.SERIALIZE);
+    let sql = `UPDATE AI SET status=?, title=?, priority=?, type=? WHERE id=?`;
+    let params = [payload.status, payload.title, payload.priority, payload.type, payload.id];
+    run(sql, params, (error, result) => requestHandler(error, result, req, res, next), DB_RUN_MODE.SERIALIZE);
 });
 
 router.all('/add', function (req, res, next) {
 
     let todo = req.body;
-    let sql = `INSERT INTO AI(id, label, status, ts) VALUES(?, ?, ?, ?)`;
-
-    run(sql, [Date.now(), todo.label, todo.status, Date.now()], (error, result) => requestHandler(error, result, req, res, next));
+    let sql = `INSERT INTO AI(id, title, status, priority, type) VALUES(?, ?, ?, ?, ?)`;
+    let params = [Date.now(), todo.title, todo.status||TODO_STATUS.OPEN, todo.priority || TODO_PRIORITY.NORMAL, todo.type||TODO_TYPE.TASK];
+    run(sql, params, (error, result) => requestHandler(error, result, req, res, next));
 });
 
 module.exports = router;
