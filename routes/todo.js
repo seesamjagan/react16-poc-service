@@ -1,3 +1,5 @@
+var { ResponceVo } = require('./vo');
+
 var express = require('express');
 var router = express.Router();
 
@@ -55,15 +57,6 @@ const DB_RUN_MODE = {
     SERIALIZE: 'serialize',
 }
 
-class ResponceVo {
-    constructor(status, data, message = null, code = 0) {
-        this.status = status;
-        this.data = data;
-        this.message = message;
-        this.code = code;
-    }
-}
-
 const requestHandler = (error, result, req, res, next) => {
     if (error) {
         res.send(new ResponceVo(false, error, error.message));
@@ -86,6 +79,9 @@ function run(sql, params = [], callback = null, runMode = false, useAll=false) {
                     if(!Array.isArray(sql)) {
                         queries = [sql];
                     }
+                    // This if case is logis is not working. Find Y?
+                    console.log('sql: %O \n queries: %O \n params: %O', sql, queries, params);
+
                     queries.forEach(sql, ()=>{
                         db[command](sql, params, (error, rows) => {
                             if (error) {
@@ -155,7 +151,7 @@ router.all('/update', function (req, res, next) {
     let payload = req.body;
     let sql = `UPDATE AI SET status=?, title=?, priority=?, type=? WHERE id=?`;
     let params = [payload.status, payload.title, payload.priority, payload.type, payload.id];
-    run(sql, params, (error, result) => requestHandler(error, result, req, res, next), DB_RUN_MODE.SERIALIZE);
+    run(sql, params, (error, result) => requestHandler(error, result, req, res, next), DB_RUN_MODE.DEFAULT);
 });
 
 router.all('/add', function (req, res, next) {
